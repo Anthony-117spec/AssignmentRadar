@@ -1,0 +1,8 @@
+requests>=2.31,<3
+beautifulsoup4>=4.12
+win11toast>=0.35; sys_platform == "win32"
+pystray>=0.19.5; sys_platform == "win32"
+Pillow>=10.0; sys_platform == "win32"
+# radar import 直读浏览器 cookie 库时用（AES-256-GCM 解 v10 cookie）；
+# CDP 路径（radar browser）只用标准库，不需要它。
+pycryptodome>=3.20; sys_platform == "win32"

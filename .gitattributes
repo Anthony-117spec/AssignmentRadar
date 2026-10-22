@@ -1,0 +1,17 @@
+# 统一换行符，避免中文文档在 Windows / Linux 之间被整体改写
+* text=auto
+
+*.md    text eol=lf
+*.py    text eol=lf
+*.toml  text eol=lf
+*.txt   text eol=lf
+*.yml   text eol=lf
+
+# Windows 批处理必须是 CRLF，否则某些命令解析会出问题
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# 图片按二进制处理，不做任何换行转换
+*.png   binary
+*.jpg   binary
+*.ico   binary

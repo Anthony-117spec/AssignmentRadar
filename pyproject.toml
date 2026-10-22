@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "assignmentradar"
+dynamic = ["version"]
+description = "Moodle 作业雷达：自动发现新作业、DDL 提醒、附件归档（Windows 命令行工具）"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["moodle", "assignment", "deadline", "reminder", "windows", "cli"]
+authors = [{ name = "AssignmentRadar contributors" }]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Office/Business :: Scheduling",
+]
+dependencies = [
+    "requests>=2.31,<3",
+    "beautifulsoup4>=4.12",
+    "win11toast>=0.35; sys_platform == 'win32'",
+    "pystray>=0.19.5; sys_platform == 'win32'",
+    "Pillow>=10.0; sys_platform == 'win32'",
+    "pycryptodome>=3.20; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/Anthony-117spec/AssignmentRadar"
+
+# 有意不提供 [project.scripts]：本工具用「脚本所在目录」定位 config.toml 与 data/，
+# 装进 site-packages 之后这个锚点就错了（会把配置和数据写进 site-packages）。
+# 唯一入口是随目录走的 radar.bat / radar.py，复制到哪台机器都能用。
+[tool.setuptools]
+packages = ["assignmentradar"]
+
+[tool.setuptools.dynamic]
+version = { attr = "assignmentradar.__version__" }
