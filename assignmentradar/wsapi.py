@@ -5,7 +5,7 @@
 原有通路是"爬 HTML"，而 HTML 需要 `MoodleSession`——平台那个会话大约 10~12 小时
 就死一次，死掉之后清单就停在旧数据上（用户 2026-10-10 报的"数据更新于凌晨"）。
 会话过期后 `requests` 又走不通登录链路（网关改过入口、回调不升级票据），
-于是只能人工 `radar browser login`。这是整条链上最难受的一环。
+于是只能人工 `radar.bat browser login`。这是整条链上最难受的一环。
 
 `wstoken` 换掉了这一环：它是平台**自己发的**长期令牌（在 `/user/managetoken.php`
 创建，可随时吊销），配合 `webservice/rest/server.php` 直接返回结构化 JSON。

@@ -130,8 +130,8 @@ class Notifier:
         self._queue.put(
             Message(
                 "AssignmentRadar：登录已过期",
-                "自动续期失败，提醒已暂停。请在浏览器重新登录平台后运行 radar import"
-                "（一条命令即可恢复；若 SSO 也过期，用 radar import --sso）",
+                "自动续期失败，提醒已暂停。请在浏览器重新登录平台后运行 radar.bat import"
+                "（一条命令即可恢复；若 SSO 也过期，用 radar.bat import --sso）",
                 base_url,
             )
         )
@@ -141,6 +141,6 @@ class Notifier:
             Message(
                 "AssignmentRadar：SSO 会话已失效",
                 "moodle 会话目前仍正常，但自动续期已不可用。请在浏览器登录统一身份认证、"
-                "确认进入个人页后运行 radar import --sso，以免下次轮询彻底断线",
+                "确认进入个人页后运行 radar.bat import --sso，以免下次轮询彻底断线",
             )
         )

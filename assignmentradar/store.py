@@ -76,7 +76,7 @@ class Store:
         self._conn.row_factory = sqlite3.Row
         # list 命令的自动刷新可能与常驻实例的轮询并发写库，等待而非报错
         self._conn.execute("PRAGMA busy_timeout = 10000")
-        # WAL：读写不再互斥到"整个库锁住"的程度——常驻轮询在写时，`radar list`
+        # WAL：读写不再互斥到"整个库锁住"的程度——常驻轮询在写时，`radar.bat list`
         # 的读能立刻拿到旧快照，而不是干等 busy_timeout 走完。模式是持久的，
         # 写一次就够；网络盘不支持时会失败，退回默认日志模式即可。
         try:

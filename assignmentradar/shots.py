@@ -9,7 +9,7 @@
 实现要点
 --------
 * 截图必须靠**真实浏览器渲染**（`requests` 拿到的 HTML 没有版面），所以走 CDP。
-* 因此需要一个**已登录的私有配置目录浏览器**——`radar browser login` 登录过一次即可。
+* 因此需要一个**已登录的私有配置目录浏览器**——`radar.bat browser login` 登录过一次即可。
   会话过期时渲染出来的是登录页；那种截图毫无意义，所以**预检不通过就直接放弃**，
   绝不往归档里塞一堆登录页。
 * 与附件一样是**幂等**的：同名截图已存在就跳过，重跑不花时间。
@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -108,7 +109,18 @@ def capture(browser: BrowserSession, tasks: list[ShotTask], root: Path, *,
             summary.failed += 1
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(blob)
+        tmp = dest.with_name(dest.name + ".part")
+        try:
+            tmp.write_bytes(blob)
+            os.replace(tmp, dest)
+        except OSError as exc:
+            log.warning("截图写入失败 %s：%s", dest, exc)
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            summary.failed += 1
+            continue
         summary.saved += 1
         summary.paths.append(dest)
         if on_event:

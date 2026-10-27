@@ -68,8 +68,9 @@ def _needs_setup(base_dir: Path) -> bool:
     except Exception:
         return False
     cookie = str(raw.get("cookie") or "").strip()
+    sso = str(raw.get("sso_cookie") or "").strip()
     token = str(raw.get("ws_token") or "").strip()
-    return not (cookie or token)
+    return not (cookie or sso or token)
 
 
 def _console_safe() -> None:
@@ -409,16 +410,20 @@ def _cmd_set_cookie(base_dir: Path, args) -> int:
         # 最常见的翻车：把 SSO 的 Cookie 贴进了平台的字段——自动纠正到正确字段
         print("! 检测到粘贴的是统一身份认证（sso.scnu.edu.cn）的 Cookie（含 JSESSIONID 等条目），"
               "不是平台的。")
-        print("  已自动写入 sso_cookie 字段（效果等同 radar set-cookie --sso），"
+        print("  已自动写入 sso_cookie 字段（效果等同 radar.bat set-cookie --sso），"
               "平台会话仍需另行复制。")
         target = "sso_cookie"
     elif kind == "moodle" and want_sso:
         print("! 检测到粘贴的是平台（moodle.scnu.edu.cn）的 Cookie（含 MoodleSession），"
               "不是统一身份认证的。")
-        print("  已自动写入 cookie 字段（效果等同 radar set-cookie）。")
+        print("  已自动写入 cookie 字段（效果等同 radar.bat set-cookie）。")
         target = "cookie"
 
-    count = set_cookie(base_dir, raw, field=target)
+    try:
+        count = set_cookie(base_dir, raw, field=target)
+    except (ValueError, RuntimeError) as exc:
+        print(f"✗ 没能写入 config.toml：{exc}")
+        return 1
     where = "SSO cookie（sso_cookie 字段）" if target == "sso_cookie" else "cookie（cookie 字段）"
     print(f"✓ 已写入 {count} 个 {where}到 config.toml（这是登录凭证，切勿外传 config.toml）")
     print("验证一下：python radar.py check   （会话过期时会自动尝试 SSO 续期）")
@@ -506,11 +511,19 @@ def _cmd_import(base_dir: Path, args) -> int:
             print(f"[dry-run] 将写入 sso_cookie 字段：\n  {_mask(sso)}")
         return 0
 
-    n = set_cookie(base_dir, moodle)
+    try:
+        n = set_cookie(base_dir, moodle)
+    except (ValueError, RuntimeError) as exc:
+        print(f"\n✗ 没能写入 config.toml：{exc}")
+        return 1
     print(f"\n✓ 已从 {jar.browser} 读取平台会话并写入 config.toml（{n} 个条目）")
     print(f"  {_mask(moodle)}")
     if sso:
-        n2 = set_cookie(base_dir, sso, field="sso_cookie")
+        try:
+            n2 = set_cookie(base_dir, sso, field="sso_cookie")
+        except (ValueError, RuntimeError) as exc:
+            print(f"✗ 平台会话已写入，但 SSO 会话写入失败：{exc}")
+            return 1
         print(f"✓ 同时找到 SSO 会话，已写入 sso_cookie 字段（{n2} 个条目）")
     else:
         print("（未同时导入 SSO cookie；需要时加 --sso）")
@@ -533,7 +546,7 @@ def _import_via_cdp(base_dir: Path, *, want_sso: bool, dry: bool) -> int:
     """走调试协议从私有配置目录取会话（绕开 cookie 加密问题的兜底路径）。
 
     HEADLESS 起私有配置目录的 Chrome → 读 /my/ → 若已登录，取出 cookie 落盘。
-    若该目录从未登录过，则明确提示用户先运行 `radar browser login`。
+    若该目录从未登录过，则明确提示用户先运行 `radar.bat browser login`。
     """
     from .browser import find_browser
     from .cdp import BrowserSession, CdpError
@@ -570,10 +583,18 @@ def _import_via_cdp(base_dir: Path, *, want_sso: bool, dry: bool) -> int:
             print(f"[dry-run] 将写入 sso_cookie 字段：\n  {_mask(snap.sso_cookie)}")
         return 0
 
-    n = set_cookie(base_dir, snap.cookie)
+    try:
+        n = set_cookie(base_dir, snap.cookie)
+    except (ValueError, RuntimeError) as exc:
+        print(f"✗ 没能写入 config.toml：{exc}")
+        return 1
     print(f"✓ 已写入 config.toml（{n} 个条目）：{_mask(snap.cookie)}")
     if want_sso and snap.sso_cookie:
-        n2 = set_cookie(base_dir, snap.sso_cookie, field="sso_cookie")
+        try:
+            n2 = set_cookie(base_dir, snap.sso_cookie, field="sso_cookie")
+        except (ValueError, RuntimeError) as exc:
+            print(f"✗ 平台会话已写入，但 SSO 会话写入失败：{exc}")
+            return 1
         print(f"✓ 同时找到 SSO 会话，已写入 sso_cookie 字段（{n2} 个条目）")
     elif want_sso:
         print("（私有配置目录里没有 SSO 会话；需要时在该窗口里也登录一次统一身份认证）")
@@ -587,7 +608,7 @@ def _cmd_browser(base_dir: Path, args) -> int:
     为什么是它
     ----------
     新版 Chrome 对 cookie 启用了 App-Bound 加密（密文以 `v20` 开头，密钥被系统级
-    DPAPI 包着），直读 cookie 库根本解不开——这正是 `radar import` 在用户机器上
+    DPAPI 包着），直读 cookie 库根本解不开——这正是 `radar.bat import` 在用户机器上
     失败的原因。但浏览器自己知道所有 cookie：只要给它一个调试端口，用
     `Network.getAllCookies` 就能拿到明文，完全不需要任何权限。
 
@@ -692,10 +713,18 @@ def _browser_login(base_dir: Path, cfg, exe: str, prof: Path, *, timeout: int) -
         print("  或改用  python radar.py import（直接从日常浏览器读，若未被加密拦截）。")
         return 1
 
-    n = set_cookie(base_dir, snap.cookie)
+    try:
+        n = set_cookie(base_dir, snap.cookie)
+    except (ValueError, RuntimeError) as exc:
+        print(f"✗ 没能写入 config.toml：{exc}")
+        return 1
     print(f"✓ 登录成功，已取回会话并写入 config.toml（{n} 个条目）：{_mask(snap.cookie)}")
     if snap.sso_cookie:
-        n2 = set_cookie(base_dir, snap.sso_cookie, field="sso_cookie")
+        try:
+            n2 = set_cookie(base_dir, snap.sso_cookie, field="sso_cookie")
+        except (ValueError, RuntimeError) as exc:
+            print(f"✗ 平台会话已写入，但 SSO 会话写入失败：{exc}")
+            return 1
         print(f"✓ 同时取到 SSO 会话，已写入 sso_cookie 字段（{n2} 个条目）")
     print("\n验证一下：python radar.py check")
     return 0
@@ -832,7 +861,7 @@ def _capture_shots(base_dir: Path, cfg, pages: list[tuple[str, str, str]], root:
     """给每份作业截一张「布置页面」整页图，便于人工核对归档是否完整。
 
     截图必须靠真实浏览器渲染，所以走私有配置目录的 CDP 会话——那需要
-    `radar browser login` 登录过一次。任何一步不可用都**只提示、不报错**，
+    `radar.bat browser login` 登录过一次。任何一步不可用都**只提示、不报错**，
     不能因为"截不了图"就让附件归档看起来失败。
     """
     from . import shots
@@ -874,7 +903,7 @@ def _explain_stale(errors: list[str]) -> None:
 
     以前这里只提示"检查 sso_cookie 是否配置/有效"，但现实中九成的情况是**会话整个失效**，
     而自动续期因为网关改过登录入口已经走不通（`/rump_frontend/login/` 现在返回 404）。
-    用户真正需要知道的是：跑一次 `radar browser login` 就能恢复。
+    用户真正需要知道的是：跑一次 `radar.bat browser login` 就能恢复。
     """
     joined = "；".join(errors)
     print("  （下面展示的是上次成功巡逻的旧数据）")
@@ -882,7 +911,7 @@ def _explain_stale(errors: list[str]) -> None:
         print()
         print("  会话已失效，自动续期也没能救回来（网关改过登录入口，这条路已经走不通）。")
         print("  恢复只要一条命令：")
-        print("      radar browser login     # 弹一个独立窗口，登录一次即可")
+        print("      radar.bat browser login     # 弹一个独立窗口，登录一次即可")
         print("  登录成功后，本命令会立刻刷新，后台轮询也会自动跟上。")
     else:
         print("  具体原因看 data/radar.log 的最后几行。")
@@ -924,7 +953,7 @@ def _cmd_list(base_dir: Path, args) -> int:
     last_duration = store.get_meta("last_poll_duration")
     last_path = store.get_meta("last_poll_path")
 
-    # **默认只读缓存（零请求）**：后台循环（`radar run` / `radar loop`）每 2 小时刷
+    # **默认只读缓存（零请求）**：后台循环（`radar.bat run` / `radar.bat loop`）每 2 小时刷
     # 一轮、把结果写进台账，打开清单不该让用户干等半分钟——实测首屏要 25~40 秒，
     # 正是要消灭的东西。想现场刷新就显式加 `--refresh`。
     if getattr(args, "refresh", False):
@@ -956,14 +985,14 @@ def _cmd_list(base_dir: Path, args) -> int:
         stale = stale_age > max(2 * cfg.poll_interval_minutes * 60, 3600)
     if stale:
         print("⚠ 下面是**过期数据**：后台刷新已经很久没能成功了，别拿它当现在的状态。")
-        print("  想立刻刷新：radar list --refresh")
+        print("  想立刻刷新：radar.bat list --refresh")
 
     rows = store.assignments_with_course()
     grade_rows = store.grades_with_course(graded_only=True)
     store.close()
     if not rows:
-        print("还没有数据：先跑一轮 python radar.py once，或启动 run / loop（loop 是给"
-              " start_cranium.bat 这类一键启动器用的无头刷新循环）。")
+        print("还没有数据：先跑一轮 python radar.py once，或启动 radar.bat run / "
+              "radar.bat loop（loop 是无头刷新循环，适合放进任务计划或别的启动脚本）。")
         return 1
     overdue, upcoming, unknown, submitted = build_lists(rows, now, ignore_before)
     ignored = len(rows) - (len(overdue) + len(upcoming) + len(unknown) + len(submitted))
@@ -1105,25 +1134,38 @@ def _cmd_check(base_dir: Path, args=None) -> int:
     # 令牌通路自检放在最前面：配了令牌的用户，数据本来就不依赖 cookie，
     # 再拿"会话过期"去吓他是不对的。会话只影响整页截图。
     ws_ok = False
+    ws_api = None
+    ws_courses = []
     if (cfg.ws_token or "").strip():
         from .wsapi import WsApi, WsError, WsUnavailable
 
         try:
-            ws_courses = WsApi(cfg).courses(cfg.semester)
+            ws_api = WsApi(cfg)
+            ws_courses = ws_api.courses(cfg.semester)
         except (WsUnavailable, WsError) as exc:
             print(f"△ 令牌通路不可用：{exc}")
             print("  （换成可用的服务重新 set-token 即可；下面继续按 cookie 检查）")
         else:
             ws_ok = True
             print(f"✓ 令牌通路正常：{len(ws_courses)} 门本学期课程（**数据不依赖 cookie**）")
-            for c in ws_courses:
-                print(f"  - {c.name}")
             print("  （cookie 只影响作业页整页截图，见用户手册 4.1 节）")
         print()
 
     if not cfg.cookie and not cfg.sso_cookie:
         if ws_ok:
             print("没有 cookie——数据通路没问题，但作业页整页截图用不了。")
+            try:
+                by_course = ws_api.assignments([c.course_id for c in ws_courses])
+            except (WsUnavailable, WsError) as exc:
+                print(f"（作业数量读取失败：{exc}）")
+            else:
+                total = sum(len(items) for items in by_course.values())
+                for c in ws_courses:
+                    briefs = by_course.get(c.course_id, [])
+                    names = "、".join(a.name for a in briefs[:3])
+                    tail = f"：{names}" + ("…" if len(briefs) > 3 else "") if briefs else ""
+                    print(f"  - {c.name}（{len(briefs)} 个作业）{tail}")
+                print(f"共 {total} 个作业。")
             print("想要截图就运行：python radar.py browser login")
             return 0
         print("✗ 还没有配置 cookie，最快的方式：")
@@ -1223,7 +1265,7 @@ def _already_running(port: int) -> bool:
 
 
 class InstanceLock:
-    """进程级排它锁：保证同一时间只有一个 `radar run` 在巡逻。
+    """进程级排它锁：保证同一时间只有一个 `radar.bat run` 在巡逻。
 
     为什么不能只靠端口探测？**端口探测是竞态的**——两个进程可能同时发现"端口还没人
     监听"，于是双双启动。2026-10-09 实测踩到：两个实例在同一秒启动，一起跑了三个多小时，
@@ -1315,8 +1357,10 @@ def _spawn_list_window(base_dir: Path) -> None:
 def _cmd_run(base_dir: Path, args) -> int:
     cfg = load_config(base_dir)
     # 双重保险：端口探测能挡住"旧版本/别的启动方式"起的实例，文件锁负责挡住竞态。
+    # 只有真要开面板时才探测端口——--no-panel 下 8731 被别的程序占着不代表雷达在跑。
+    panel_enabled = not getattr(args, "no_panel", False)
     lock = InstanceLock(cfg.data_dir / "radar.lock")
-    if _already_running(cfg.dashboard_port) or not lock.acquire():
+    if (panel_enabled and _already_running(cfg.dashboard_port)) or not lock.acquire():
         _spawn_list_window(base_dir)
         print("AssignmentRadar 已在运行，已弹出终端清单。")
         return 0
@@ -1330,10 +1374,10 @@ def _cmd_loop(base_dir: Path, args) -> int:
     """无头刷新循环：只轮询，不托盘、不面板、不弹窗。
 
     给一键启动器用：它们已经有自己的窗口和服务，雷达再弹一个托盘/面板只会添乱。
-    数据照样每轮写进台账，`radar list`
+    数据照样每轮写进台账，`radar.bat list`
     因此永远有缓存可读——"打开即见上次结果"靠的就是它。
 
-    与 `radar run` 共用同一把 `data/radar.lock`：谁先起谁跑，另一个自动让位。
+    与 `radar.bat run` 共用同一把 `data/radar.lock`：谁先起谁跑，另一个自动让位。
     """
     def say(msg: str) -> None:
         # 一键启动器多半用 pythonw 拉起（无控制台），此时 print 会直接抛
@@ -1344,14 +1388,14 @@ def _cmd_loop(base_dir: Path, args) -> int:
 
     cfg = load_config(base_dir)
     lock = InstanceLock(cfg.data_dir / "radar.lock")
-    if _already_running(cfg.dashboard_port) or not lock.acquire():
-        # 已有实例在跑（radar run 或另一个 loop）。循环的目的只是"保证有人在定时
+    if not lock.acquire():
+        # 已有实例在跑（radar.bat run 或另一个 loop）。循环的目的只是"保证有人在定时
         # 刷新"——已经有人在做了，这次启动就是多余的，安静退出即可。
         log.info("已有 AssignmentRadar 实例在运行，本次 loop 启动取消")
         return 0
     say(f"AssignmentRadar 无头刷新循环已启动：每 {cfg.poll_interval_minutes} 分钟一轮，"
         f"数据写入 {cfg.db_path}")
-    say("查看清单：radar list    退出：Ctrl+C")
+    say("查看清单：radar.bat list    退出：Ctrl+C")
     app = App(cfg)
     try:
         app.run_forever()
@@ -1372,24 +1416,35 @@ def _run_locked(base_dir: Path, cfg, args) -> int:
         _, url = start_dashboard(app)
     else:
         print("网页面板已关闭（--no-panel），看清单请用：radar.bat list")
-    if not cfg.cookie and not cfg.sso_cookie:
-        print("⚠ 尚未配置 cookie：请先运行 radar set-cookie（面板里也会看到红色横幅）")
-    # 启动时的可见反馈：默认弹终端清单（网页面板仍可用但不再自动打开）
+    has_cookie = bool((cfg.cookie or "").strip())
+    has_sso = bool((cfg.sso_cookie or "").strip())
+    has_token = bool((cfg.ws_token or "").strip())
+    if not (has_cookie or has_sso or has_token):
+        print("⚠ 尚未配置任何凭证：请先运行 radar.bat import --sso 或 radar.bat set-token")
+    elif not (has_cookie or has_sso) and has_token:
+        print("· 未配置 cookie：数据走令牌通路，作业页整页截图暂不可用"
+              "（需要时运行 radar.bat browser login）")
+    # 启动时的可见反馈：终端清单与浏览器面板是两个独立开关，可同时开
     if getattr(cfg, "open_list_on_start", True):
         _spawn_list_window(base_dir)
-    elif url and cfg.open_dashboard_on_start:
+    if url and cfg.open_dashboard_on_start:
         webbrowser.open(url)
+    tray = None
     use_tray = not getattr(args, "no_tray", False)
     if use_tray:
         try:
             from .tray import Tray
+
+            # 构造期就会 import pystray/Pillow；放在 try 里才能在缺依赖时优雅退到控制台，
+            # 而不是在轮询线程已经启动之后再崩掉。
+            tray = Tray(app, url)
         except Exception as exc:
             print(f"托盘不可用（{exc}），进入控制台模式，Ctrl+C 退出。")
             use_tray = False
     if use_tray:
         threading.Thread(target=app.run_forever, name="poller", daemon=True).start()
         try:
-            Tray(app, url).run()
+            tray.run()
         finally:
             app.shutdown()
     else:
@@ -1416,7 +1471,9 @@ def _cmd_install(base_dir: Path) -> int:
         vbs.parent.mkdir(parents=True, exist_ok=True)
         vbs.write_text(
             f'CreateObject("Wscript.Shell").Run """{pythonw}"" ""{radar}"" run", 0, False\n',
-            encoding="utf-8",
+            # WSH 对无 BOM 的 UTF-8 会按系统 ANSI 代码页解析，中文安装路径会变乱码、
+            # 自启静默失败；UTF-16 带 BOM 是它原生支持的 Unicode 形式。
+            encoding="utf-16",
         )
     except OSError as exc:
         # 自启只是"省一次双击"，不是必需项——写不进去也要给出等价替代，而不是抛异常

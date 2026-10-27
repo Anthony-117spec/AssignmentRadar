@@ -176,6 +176,7 @@ class TestDownloadOne(unittest.TestCase):
             http = FakeHTTP(blobs={"u": b"%PDF-1.4 data"})
             self.assertEqual(att.download_one(http, "u", dest), "saved")
             self.assertEqual(dest.read_bytes(), b"%PDF-1.4 data")
+            self.assertEqual(list(dest.parent.glob("*.part")), [], "原子写入不该留下临时文件")
 
     def test_skips_existing_without_any_request(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -309,6 +310,18 @@ class TestCollect(unittest.TestCase):
         http = FakeHTTP(pages={"https://moodle.test/mod/assign/view.php?id=1001": self.PAGE})
         self.assertEqual(att.collect(http, semester=None, only_cmids={9999}), [])
         self.assertEqual(len(att.collect(http, semester=None, only_cmids={1001})), 1)
+
+
+class TestLogRedaction(unittest.TestCase):
+    """令牌通路的附件 URL 带 `token=...`，日志里必须抹掉。"""
+
+    def test_token_query_is_redacted(self):
+        url = ("https://moodle.test/webservice/pluginfile.php/1/mod_assign/intro/a.pdf"
+               "?token=SECRET123&forcedownload=1")
+        redacted = att._redact_url(url)
+        self.assertNotIn("SECRET123", redacted)
+        self.assertIn("token=<redacted>", redacted)
+        self.assertIn("forcedownload=1", redacted)
 
 
 if __name__ == "__main__":

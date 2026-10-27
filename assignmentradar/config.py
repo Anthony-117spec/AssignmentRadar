@@ -257,7 +257,7 @@ def _write_toml_field(base_dir: Path, field: str, value: str, *, attempts: int =
 
     背景（2026-10-16 修复）：常驻托盘的轮询线程会在后台续期 cookie
     （poller._persist_cookies）。旧实现是 `read_text()` → `write_text()` 两步，
-    中间隔着整段网络往返——你在终端跑 `radar set-token` 的同一瞬间，它手里那份
+    中间隔着整段网络往返——你在终端跑 `radar.bat set-token` 的同一瞬间，它手里那份
     **旧文本**写完就回去了，你刚粘的 token 凭空消失，而下一次轮询只是「静默
     回退 HTML 通路」，界面上一个字都不提。
 

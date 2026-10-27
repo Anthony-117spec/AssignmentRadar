@@ -27,6 +27,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,6 +41,14 @@ DEFAULT_DIRNAME = "homework"
 
 # Windows 文件名里不允许出现的字符，外加控制字符
 _ILLEGAL = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+# 令牌通路的 pluginfile 链接把 ws_token 放在 query 里；日志里必须抹掉，
+# 否则一次下载失败就会把长期令牌原样写进 radar.log。
+_TOKEN_QUERY = re.compile(r"(?i)([?&]token=)[^&\s]+")
+
+
+def _redact_url(url: str) -> str:
+    return _TOKEN_QUERY.sub(r"\1<redacted>", url or "")
 
 # 会话过期时平台会把这些请求重定向到登录页，返回 HTML——绝不能当成附件存下来
 _HTML_HEAD = (b"<!doctype", b"<html", b"<?xml")
@@ -145,17 +154,29 @@ def download_one(http, url: str, dest: Path, *, force: bool = False) -> str:
     try:
         blob = _fetch(http, url)
     except Exception:
-        log.warning("附件下载失败：%s", url, exc_info=True)
+        log.warning("附件下载失败：%s", _redact_url(url), exc_info=True)
         return "failed"
     if not blob:
-        log.warning("附件内容为空：%s", url)
+        log.warning("附件内容为空：%s", _redact_url(url))
         return "failed"
     if _looks_like_html(blob):
         # 多半是会话过期被弹到登录页——不能把 HTML 当附件存
-        log.warning("附件请求返回的是网页（会话可能已过期）：%s", url)
+        log.warning("附件请求返回的是网页（会话可能已过期）：%s", _redact_url(url))
         return "failed"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(blob)
+    # 先写 .part 再原子替换：直接 write_bytes 中途失败会留下半份文件，
+    # 下次运行看到 dest.exists() 就永远跳过了，归档里一直是一份坏文件。
+    tmp = dest.with_name(dest.name + ".part")
+    try:
+        tmp.write_bytes(blob)
+        os.replace(tmp, dest)
+    except OSError as exc:
+        log.warning("附件写入失败 %s：%s", dest, exc)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return "failed"
     return "saved"
 
 

@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from assignmentradar.cli import InstanceLock  # noqa: E402
+from assignmentradar.cli import InstanceLock, _needs_setup  # noqa: E402
 
 
 class TestInstanceLock(unittest.TestCase):
@@ -132,6 +132,28 @@ class TestInstanceLockAcrossProcesses(unittest.TestCase):
             after = InstanceLock(lock_path)
             self.assertTrue(after.acquire(), "持有者退出后应能正常启动")
             after.release()
+
+
+class TestNeedsSetup(unittest.TestCase):
+    """只配 SSO 也算"配置过"。
+
+    2026-10-27 发版前审计发现 `_needs_setup` 只看 cookie / ws_token，
+    只配 sso_cookie 的用户启动 `run` 会被当成首次运行、打印引导后直接退出。
+    """
+
+    def test_sso_only_counts_as_configured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "config.toml").write_text(
+                'sso_cookie = "JSESSIONID=x"\n', encoding="utf-8"
+            )
+            self.assertFalse(_needs_setup(Path(tmp)))
+
+    def test_empty_config_needs_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "config.toml").write_text(
+                'cookie = ""\nsso_cookie = ""\nws_token = ""\n', encoding="utf-8"
+            )
+            self.assertTrue(_needs_setup(Path(tmp)))
 
 
 if __name__ == "__main__":

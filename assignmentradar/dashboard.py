@@ -86,7 +86,7 @@ async function refresh() {
     const banner = document.getElementById("banner");
     if (st.session_ok === false) {
       banner.style.display = "block";
-      banner.innerHTML = "&#9888; 平台登录已过期，提醒已暂停。请在浏览器重新登录后运行 <code>radar set-cookie</code>";
+      banner.innerHTML = "&#9888; 平台登录已过期，提醒已暂停。请在浏览器重新登录后运行 <code>radar.bat import</code>";
     } else { banner.style.display = "none"; }
     const dur = fmtDur(st.last_duration);
     const pathName = st.last_path === "token" ? "令牌通路"
@@ -118,8 +118,8 @@ async function refresh() {
   } catch (e) {
     const banner = document.getElementById("banner");
     banner.style.display = "block";
-    banner.innerHTML = "&#9888; 面板后端连接不上（radar run 可能已退出）。" +
-      "请重新启动：运行 <code>radar run</code> 或按 Ctrl+Alt+A，然后刷新本页。";
+    banner.innerHTML = "&#9888; 面板后端连接不上（radar.bat run 可能已退出）。" +
+      "请重新启动：运行 <code>radar.bat run</code>，然后刷新本页。";
     document.getElementById("meta").textContent = "获取状态失败：" + e;
   }
 }

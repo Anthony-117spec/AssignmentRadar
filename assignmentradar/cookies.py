@@ -25,7 +25,7 @@ Chrome 从 127 版起引入了 **App-Bound Encryption**：新写入的 cookie �
 * 本模块对 `v20` cookie **彻底失效**（`_decrypt_value` 对它们返回 None）；
 * 这不是 bug，是安全边界；不要试图提权去解。
 * **正确的替代方案是 `cdp.py`**：通过浏览器调试协议让浏览器自己把 cookie 明文
-  交出来，完全绕开加密。`radar import` 在直读拿不到会话时会自动改走 CDP。
+  交出来，完全绕开加密。`radar.bat import` 在直读拿不到会话时会自动改走 CDP。
 
 只读、绝不写用户的浏览器数据：以 `mode=ro` 打开 cookie 库的副本，读完即弃。
 """
@@ -174,24 +174,33 @@ def _copy_cookie_db(db: Path) -> Path | None:
     浏览器会以独占方式打开这个库，`shutil.copy2` 会撞上 WinError 32；但 SQLite
     的在线备份接口能穿过共享锁把内容读出来，所以这里用 `Connection.backup` 复制，
     读不到时再退回 `copy2`。
+
+    调用方读完**必须删掉副本所在目录**——里面是明文 cookie，等同于登录凭证。
     """
     tmp_dir = Path(tempfile.mkdtemp(prefix="radar-cookies-"))
     copy = tmp_dir / "Cookies"
+    src = dst = None
     try:
         src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
         dst = sqlite3.connect(copy)
         with dst:
             src.backup(dst)
-        dst.close()
-        src.close()
         return copy
     except Exception:
         log.debug("在线备份失败，退回文件复制", exc_info=True)
+    finally:
+        for conn in (dst, src):
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
     try:
         shutil.copy2(db, copy)
         return copy
     except Exception as exc:
         log.warning("cookie 库复制失败：%s", exc)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
         return None
 
 
@@ -209,15 +218,22 @@ def _read_profile(name: str, root: Path) -> CookieJar | None:
         return None
     values: dict[str, str] = {}
     detail: dict[str, dict[str, str]] = {}
+    rows = None
     try:
         conn = sqlite3.connect(f"file:{copy}?mode=ro", uri=True)
-        rows = conn.execute(
-            "select host_key, name, encrypted_value, value from cookies "
-            "where host_key like '%scnu.edu.cn'"
-        ).fetchall()
-        conn.close()
+        try:
+            rows = conn.execute(
+                "select host_key, name, encrypted_value, value from cookies "
+                "where host_key like '%scnu.edu.cn'"
+            ).fetchall()
+        finally:
+            conn.close()
     except Exception as exc:
         log.warning("%s 的 cookie 库读取失败：%s", name, exc)
+    finally:
+        # 明文 cookie 副本读完即弃，绝不留在 %TEMP% 里
+        shutil.rmtree(copy.parent, ignore_errors=True)
+    if rows is None:
         return None
     for host, cname, enc, plain in rows:
         val = plain or _decrypt_value(key, enc)

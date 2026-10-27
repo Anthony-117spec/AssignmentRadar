@@ -343,7 +343,7 @@ class BrowserSession:
             raise
 
     def attach(self, *, url: str | None = None) -> bool:
-        """附着到已经开着的调试实例（例如 `radar browser login` 留下的窗口）。
+        """附着到已经开着的调试实例（例如 `radar.bat browser login` 留下的窗口）。
 
         成功返回 True 并把 `port` 设成该实例的端口；没找到返回 False。
         """

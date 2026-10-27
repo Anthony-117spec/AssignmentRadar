@@ -11,7 +11,7 @@
 让浏览器访问一次平台，网关就会**静默**重新登录——用户不用输任何东西。
 
 本模块就做这一步：无头打开私有目录 → 导航平台 → 取回新会话写回 config。
-SSO 也过期了就如实返回失败，由上层提示用户跑 `radar browser login`（那是唯一的出路）。
+SSO 也过期了就如实返回失败，由上层提示用户跑 `radar.bat browser login`（那是唯一的出路）。
 """
 from __future__ import annotations
 

@@ -23,6 +23,7 @@ venv/
 *.log
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Agent 工作区
 .zcode/

@@ -71,7 +71,14 @@ class App:
         self.ws = wsapi.WsApi(cfg) if (cfg.ws_token or "").strip() else None
         self.http.on_cookies_changed = self._persist_cookies
         self.http.on_sso_cookies_changed = self._persist_sso_cookies
-        self.notifier = Notifier(cfg) if ((cfg.cookie or cfg.sso_cookie) and notify_enabled) else None
+        # 通知是否启用只看"有没有配置过任何一种凭证"，不能只看 cookie：
+        # 令牌通路下数据完全不碰 cookie，若这里再用 cookie 门控，
+        # 按推荐流程（先 set-token）装好的用户会一条提醒都收不到。
+        has_credentials = any(
+            (value or "").strip()
+            for value in (cfg.cookie, cfg.sso_cookie, cfg.ws_token)
+        )
+        self.notifier = Notifier(cfg) if (has_credentials and notify_enabled) else None
         # list 命令的临时刷新用：会话过期时不弹 toast（避免连按轰炸），
         # 新作业/变更/提醒照常发
         self.quiet_session_notify = quiet_session_notify
@@ -186,7 +193,7 @@ class App:
             self._handle_expired()
             s = PollSummary()
             s.errors.append(
-                "会话过期，自动续期失败（跑一次 radar browser login 即可恢复）"
+                "会话过期，自动续期失败（跑一次 radar.bat browser login 即可恢复）"
             )
             self._finish(s, ok=False)
             return s
@@ -243,17 +250,23 @@ class App:
             log.info("已在会话过期前静默续期")
 
     def _reload_session_from_config(self) -> bool:
-        """用户可能刚更新了 config 里的 cookie：重读并重建会话，返回是否有变化。"""
+        """用户可能刚更新了 config 里的 cookie / 令牌：重读并重建会话，返回是否有变化。"""
         try:
             fresh = load_config(self.cfg.base_dir)
         except Exception:
             log.exception("重读配置失败")
             return False
-        if fresh.cookie == self.cfg.cookie and fresh.sso_cookie == self.cfg.sso_cookie:
+        if (
+            fresh.cookie == self.cfg.cookie
+            and fresh.sso_cookie == self.cfg.sso_cookie
+            and fresh.ws_token == self.cfg.ws_token
+        ):
             return False
-        log.info("检测到 config 里的 cookie 已更新，重载会话后重试")
+        log.info("检测到 config 里的凭证已更新，重载会话后重试")
         self.cfg.cookie = fresh.cookie
         self.cfg.sso_cookie = fresh.sso_cookie
+        self.cfg.ws_token = fresh.ws_token
+        self.ws = wsapi.WsApi(self.cfg) if (fresh.ws_token or "").strip() else None
         self.http = MoodleHTTP(self.cfg)
         self.http.on_cookies_changed = self._persist_cookies
         self.http.on_sso_cookies_changed = self._persist_sso_cookies

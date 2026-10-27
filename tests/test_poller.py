@@ -7,6 +7,7 @@ import unittest
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -559,6 +560,41 @@ class TestBrowserRefresh(unittest.TestCase):
                                 datetime.now().isoformat(timespec="seconds"))
         self.assertFalse(self.app._browser_refresh())
         self.assertEqual(calls, [], "30 分钟内不该重复尝试")
+
+
+class TestNotifierGating(unittest.TestCase):
+    """通知不能只在"有 cookie"时才启用。
+
+    推荐安装流程是先配 ws_token（数据完全不依赖 cookie）。2026-10-27 发版前审计发现
+    App 只在 cookie/sso_cookie 非空时才创建 Notifier，令牌用户因此收不到任何新作业 /
+    DDL 提醒——按文档装完就只剩一个"看清单"的工具。
+    """
+
+    def _make_app(self, **fields):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        cfg = load_config(Path(tmp.name))
+        for name, value in fields.items():
+            setattr(cfg, name, value)
+        with mock.patch("assignmentradar.poller.Notifier") as notifier_cls:
+            app = App(cfg)
+            app.shutdown()
+        return app, notifier_cls
+
+    def test_token_only_gets_notifier(self):
+        app, notifier_cls = self._make_app(ws_token="TOK")
+        notifier_cls.assert_called_once()
+        self.assertIsNotNone(app.notifier)
+
+    def test_sso_only_gets_notifier(self):
+        app, notifier_cls = self._make_app(sso_cookie="JSESSIONID=x")
+        notifier_cls.assert_called_once()
+        self.assertIsNotNone(app.notifier)
+
+    def test_no_credentials_keeps_notifier_off(self):
+        app, notifier_cls = self._make_app()
+        notifier_cls.assert_not_called()
+        self.assertIsNone(app.notifier)
 
 
 if __name__ == "__main__":

@@ -179,5 +179,37 @@ class TestDecryptValue(unittest.TestCase):
         self.assertIsNone(cookies._decrypt_value(b"\x00" * 32, b"v10" + b"x" * 40))
 
 
+class TestTempCopyCleanup(unittest.TestCase):
+    """读 cookie 的临时副本必须删掉——里面是明文登录凭证。
+
+    2026-10-27 发版前审计发现 `_copy_cookie_db` 把库复制到 %TEMP% 后从不清理，
+    每跑一次 import 就在磁盘上多留一份可读的 cookie。
+    """
+
+    def test_read_profile_removes_temp_copy(self):
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "profile"
+            root.mkdir()
+            _make_profile(root, plain=[("moodle.scnu.edu.cn", "MoodleSession", "MS1")])
+            created: list[Path] = []
+            real_mkdtemp = tempfile.mkdtemp
+
+            def tracking_mkdtemp(*args, **kwargs):
+                path = real_mkdtemp(*args, **kwargs)
+                created.append(Path(path))
+                return path
+
+            with mock.patch("assignmentradar.cookies.tempfile.mkdtemp", tracking_mkdtemp), \
+                    mock.patch.object(cookies, "_master_key", lambda _root: b"\x00" * 32):
+                jar = cookies._read_profile("Chrome", root)
+
+            self.assertIsNotNone(jar)
+            self.assertEqual(jar.values.get("MoodleSession"), "MS1")
+            self.assertEqual(len(created), 1)
+            self.assertFalse(created[0].exists(), "明文 cookie 副本不能留在 %TEMP%")
+
+
 if __name__ == "__main__":
     unittest.main()
