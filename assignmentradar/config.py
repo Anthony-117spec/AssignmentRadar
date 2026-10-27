@@ -13,7 +13,7 @@ TEMPLATE = '''# AssignmentRadar 配置
 # 1. 浏览器登录平台 https://moodle.scnu.edu.cn
 # 2. F12 打开开发者工具 → 网络(Network) → 随便点一个 moodle 请求
 #    → 请求标头 → 复制整行 Cookie 的值（或在 应用程序→Cookie 里逐个复制）
-# 3. 运行:  python radar.py set-cookie   然后按提示粘贴
+# 3. 运行:  radar.bat set-cookie   然后按提示粘贴
 # cookie 失效时程序会弹通知提醒你重复以上步骤。
 # 注意：cookie 等同于登录凭证，不要把 config.toml 发给别人。
 
@@ -39,7 +39,7 @@ sso_cookie = ""
 #   → 点「创建令牌」→ 令牌名称随便填、有效期留空
 #   → 「服务」下拉框选 **学校自建的那一项**（`radar.py set-token` 会直接写出名字）
 #   → 保存 → 复制那一串
-#   → 运行:  python radar.py set-token
+#   → 运行:  radar.bat set-token
 # ⚠ 服务别选 `Moodle mobile web service`：名字最像，但被校方裁剪过，
 #   标准函数全被挡（accessexception），选了必定不可用。
 # 令牌随时可在同一页面吊销，不影响你的密码和其它系统。

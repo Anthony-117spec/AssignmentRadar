@@ -426,7 +426,7 @@ def _cmd_set_cookie(base_dir: Path, args) -> int:
         return 1
     where = "SSO cookie（sso_cookie 字段）" if target == "sso_cookie" else "cookie（cookie 字段）"
     print(f"✓ 已写入 {count} 个 {where}到 config.toml（这是登录凭证，切勿外传 config.toml）")
-    print("验证一下：python radar.py check   （会话过期时会自动尝试 SSO 续期）")
+    print("验证一下：radar.bat check   （会话过期时会自动尝试 SSO 续期）")
     return 0
 
 
@@ -499,9 +499,9 @@ def _cmd_import(base_dir: Path, args) -> int:
         print()
         print("✗ 浏览器里没有找到可用的平台会话。")
         print("  请先在浏览器登录 https://moodle.scnu.edu.cn（登录的是哪个浏览器就读哪个），")
-        print("  然后重新运行  python radar.py import")
+        print("  然后重新运行  radar.bat import")
         print("  （Edge 运行时其 cookie 库会被独占，读不到；此时请用 Chrome。）")
-        print("  若仍读不到，可改用独立窗口登录一次：python radar.py browser login")
+        print("  若仍读不到，可改用独立窗口登录一次：radar.bat browser login")
         return 1
 
     jar, moodle, sso = best
@@ -527,7 +527,7 @@ def _cmd_import(base_dir: Path, args) -> int:
         print(f"✓ 同时找到 SSO 会话，已写入 sso_cookie 字段（{n2} 个条目）")
     else:
         print("（未同时导入 SSO cookie；需要时加 --sso）")
-    print("\n验证一下：python radar.py check")
+    print("\n验证一下：radar.bat check")
     return 0
 
 
@@ -565,14 +565,14 @@ def _import_via_cdp(base_dir: Path, *, want_sso: bool, dry: bool) -> int:
         snap = bs.snapshot()
     except CdpError as exc:
         print(f"✗ 调试协议读取失败：{exc}")
-        print("  可改用  python radar.py browser login  打开窗口登录一次。")
+        print("  可改用  radar.bat browser login  打开窗口登录一次。")
         return 1
     finally:
         bs.stop()
 
     if not snap.logged_in or not snap.cookie:
         print("✗ 私有配置目录里还没有登录态。")
-        print("  请先运行：python radar.py browser login")
+        print("  请先运行：radar.bat browser login")
         print("  （会打开一个独立窗口，登录一次即可；之后 import 就能自动读取。）")
         return 1
 
@@ -598,7 +598,7 @@ def _import_via_cdp(base_dir: Path, *, want_sso: bool, dry: bool) -> int:
         print(f"✓ 同时找到 SSO 会话，已写入 sso_cookie 字段（{n2} 个条目）")
     elif want_sso:
         print("（私有配置目录里没有 SSO 会话；需要时在该窗口里也登录一次统一身份认证）")
-    print("\n验证一下：python radar.py check")
+    print("\n验证一下：radar.bat check")
     return 0
 
 
@@ -630,7 +630,7 @@ def _cmd_browser(base_dir: Path, args) -> int:
         if exe is None:
             return 1
         if not prof.exists():
-            print("（还没有登录过。运行  python radar.py browser login  开一次窗口即可。）")
+            print("（还没有登录过。运行  radar.bat browser login  开一次窗口即可。）")
             return 0
         bs = BrowserSession(base_dir, cfg.base_url, executable=exe)
         try:
@@ -670,7 +670,7 @@ def _cmd_browser(base_dir: Path, args) -> int:
         if snap.cookie:
             print(f"取回会话：{_mask(snap.cookie)}")
         else:
-            print("（没有取回任何 cookie；先运行 python radar.py browser login 登录一次）")
+            print("（没有取回任何 cookie；先运行 radar.bat browser login 登录一次）")
         return 0 if (snap.logged_in and snap.cookie) else 1
     return 2
 
@@ -709,8 +709,8 @@ def _browser_login(base_dir: Path, cfg, exe: str, prof: Path, *, timeout: int) -
         bs.stop()
 
     if not snap.logged_in or not snap.cookie:
-        print("✗ 等待超时，仍未检测到登录。可以重试  python radar.py browser login")
-        print("  或改用  python radar.py import（直接从日常浏览器读，若未被加密拦截）。")
+        print("✗ 等待超时，仍未检测到登录。可以重试  radar.bat browser login")
+        print("  或改用  radar.bat import（直接从日常浏览器读，若未被加密拦截）。")
         return 1
 
     try:
@@ -726,7 +726,7 @@ def _browser_login(base_dir: Path, cfg, exe: str, prof: Path, *, timeout: int) -
             print(f"✗ 平台会话已写入，但 SSO 会话写入失败：{exc}")
             return 1
         print(f"✓ 同时取到 SSO 会话，已写入 sso_cookie 字段（{n2} 个条目）")
-    print("\n验证一下：python radar.py check")
+    print("\n验证一下：radar.bat check")
     return 0
 
 
@@ -748,8 +748,8 @@ def _cmd_attach(base_dir: Path, args) -> int:
     cfg = load_config(base_dir)
     ws = WsApi(cfg) if (cfg.ws_token or "").strip() else None
     if ws is None and not cfg.cookie and not cfg.sso_cookie:
-        print("✗ 既没有 cookie 也没有 ws_token，先运行：python radar.py import")
-        print("  或者用 python radar.py set-token 配一个令牌（推荐：不受会话过期影响）")
+        print("✗ 既没有 cookie 也没有 ws_token，先运行：radar.bat import")
+        print("  或者用 radar.bat set-token 配一个令牌（推荐：不受会话过期影响）")
         return 1
 
     root = Path(args.dir) if getattr(args, "dir", None) else cfg.homework_path
@@ -769,7 +769,7 @@ def _cmd_attach(base_dir: Path, args) -> int:
             store.close()
         only_cmids = {r["cmid"] for r in rows if not r["submitted"]}
         if not only_cmids:
-            print("台账里没有「未提交」的作业（先跑一轮 python radar.py once 建立台账）。")
+            print("台账里没有「未提交」的作业（先跑一轮 radar.bat once 建立台账）。")
             return 0
 
     http = MoodleHTTP(cfg)
@@ -788,7 +788,7 @@ def _cmd_attach(base_dir: Path, args) -> int:
             ws=ws,
         )
     except SessionExpired:
-        print("✗ 会话已失效。先运行：python radar.py import")
+        print("✗ 会话已失效。先运行：radar.bat import")
         return 1
 
     want_shots = not getattr(args, "no_shots", False) and bool(pages)
@@ -884,7 +884,7 @@ def _capture_shots(base_dir: Path, cfg, pages: list[tuple[str, str, str]], root:
     try:
         if not shots.logged_in(bs):
             print("\n⚠ 私有配置目录里没有登录态，跳过作业页截图。")
-            print("  截图需要真实浏览器渲染，先跑一次：python radar.py browser login")
+            print("  截图需要真实浏览器渲染，先跑一次：radar.bat browser login")
             return 0
         print(f"\n正在为 {len(tasks)} 份作业截整页图（每份约 2 秒）…")
         summary = shots.capture(bs, tasks, root, course_dirs=cfg.course_dirs,
@@ -991,7 +991,7 @@ def _cmd_list(base_dir: Path, args) -> int:
     grade_rows = store.grades_with_course(graded_only=True)
     store.close()
     if not rows:
-        print("还没有数据：先跑一轮 python radar.py once，或启动 radar.bat run / "
+        print("还没有数据：先跑一轮 radar.bat once，或启动 radar.bat run / "
               "radar.bat loop（loop 是无头刷新循环，适合放进任务计划或别的启动脚本）。")
         return 1
     overdue, upcoming, unknown, submitted = build_lists(rows, now, ignore_before)
@@ -1072,7 +1072,7 @@ def _cmd_list(base_dir: Path, args) -> int:
                 )
     else:
         hint = ("" if (cfg.ws_token or "").strip()
-                else "（评分走令牌通路，先 python radar.py set-token）")
+                else "（评分走令牌通路，先 radar.bat set-token）")
         print(f"\n{c['dim']}📊 评分（还没有批改记录）{hint}{c['reset']}")
 
     if getattr(args, "pause", False) and sys.stdin.isatty():
@@ -1089,7 +1089,7 @@ def _cmd_renew(base_dir: Path, args=None) -> int:
 
     cfg = load_config(base_dir)
     if not cfg.sso_cookie:
-        print("✗ 尚未配置 SSO cookie。运行 python radar.py set-cookie --sso")
+        print("✗ 尚未配置 SSO cookie。运行 radar.bat set-cookie --sso")
         return 1
 
     steps: list[str] = []
@@ -1166,13 +1166,17 @@ def _cmd_check(base_dir: Path, args=None) -> int:
                     tail = f"：{names}" + ("…" if len(briefs) > 3 else "") if briefs else ""
                     print(f"  - {c.name}（{len(briefs)} 个作业）{tail}")
                 print(f"共 {total} 个作业。")
-            print("想要截图就运行：python radar.py browser login")
+            print("想要截图就运行：radar.bat browser login")
             return 0
-        print("✗ 还没有配置 cookie，最快的方式：")
-        print("  1. 浏览器登录平台 https://moodle.scnu.edu.cn")
-        print("  2. 运行  python radar.py import   （直接读取浏览器里的会话，免手抄）")
-        print("  强烈建议同时运行 python radar.py import --sso 一并配置自动续期")
-        print("  更省事的办法：python radar.py set-token 配一个令牌，从此不怕会话过期")
+        if (cfg.ws_token or "").strip():
+            print("✗ 令牌通路不可用，且没有可用的 cookie。")
+            print("  重新配置令牌：radar.bat set-token")
+            print(f"  或改用浏览器会话：在浏览器登录 {cfg.base_url}，再运行 radar.bat import --sso")
+        else:
+            print("✗ 还没有配置任何凭证。两条路，任选其一：")
+            print("  1. 配令牌（推荐，长期有效）：radar.bat set-token")
+            print(f"  2. 读浏览器会话：先在浏览器登录 {cfg.base_url}")
+            print("     然后运行 radar.bat import（加 --sso 可一并配置自动续期）")
         return 1
     http = MoodleHTTP(cfg)
     http.on_cookies_changed = lambda cs: set_cookie(base_dir, cs)
@@ -1184,19 +1188,19 @@ def _cmd_check(base_dir: Path, args=None) -> int:
             if not http.reestablish():
                 if ws_ok:
                     print("△ 自动续期失败——但令牌通路正常，**数据不受影响**。")
-                    print("  cookie 只影响作业页整页截图：想要截图就 python radar.py browser login")
+                    print("  cookie 只影响作业页整页截图：想要截图就 radar.bat browser login")
                     return 0
                 print("✗ 自动续期失败（sso_cookie 未配置或已过期）。")
-                print("  最快恢复：浏览器重新登录平台，然后运行  python radar.py import")
+                print("  最快恢复：浏览器重新登录平台，然后运行  radar.bat import")
                 return 1
             courses = moodle.discover_courses(http, semester=cfg.semester)
     except SessionExpired:
         if ws_ok:
             print("△ 会话不可用（只影响作业页整页截图，不影响数据）。")
-            print("  想要截图就运行：python radar.py browser login")
+            print("  想要截图就运行：radar.bat browser login")
             return 0
         print("✗ cookie 无效或已过期。最快恢复：浏览器重新登录平台，")
-        print("  然后运行  python radar.py import   （直接读取浏览器里的会话）")
+        print("  然后运行  radar.bat import   （直接读取浏览器里的会话）")
         return 1
     except Exception as exc:
         print(f"✗ 访问失败：{exc}")
@@ -1232,7 +1236,7 @@ def _cmd_check(base_dir: Path, args=None) -> int:
             tail = f"：{names}" + ("…" if len(briefs) > 3 else "")
         print(f"  - {c.name}（{len(briefs)} 个作业）{tail}")
     print(f"共 {total} 个作业；另有 {skipped} 门课程尚未点\"自助选课\"加入，已跳过。")
-    print("一切正常，可以运行 python radar.py run 了。")
+    print("一切正常，可以运行 radar.bat run 了。")
     return 0
 
 
