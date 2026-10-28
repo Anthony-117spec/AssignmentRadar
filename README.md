@@ -220,6 +220,10 @@ config.toml        配置（首次运行自动从模板生成）
 ## 跑测试
 
 ```bat
+:: 不装任何额外依赖，标准库 unittest 直接跑
+.venv\Scripts\python -m unittest discover -s tests
+
+:: 想要更简洁的输出，再装 pytest
 .venv\Scripts\pip install pytest
 .venv\Scripts\python -m pytest tests\ -q
 ```
