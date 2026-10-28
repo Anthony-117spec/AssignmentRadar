@@ -4,6 +4,10 @@
 SQLite，新作业出现 / 截止时间变更 / 临近截止时弹 Windows 通知。**纯命令行工具**，无 GUI 依赖
 （托盘和网页面板是可选的）。
 
+> **适用平台：华南师范大学「砺儒云课堂」**（`moodle.scnu.edu.cn`，登录走统一身份认证
+> `sso.scnu.edu.cn`）。页面解析规则与登录链路都是照这个平台写的；换到其他学校要改
+> `assignmentradar/cdp.py`、`assignmentradar/cli.py` 里的域名，且页面结构不同时解析也可能失效。
+
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-222%20passing-brightgreen)

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 用户手册（安装 / 配置 / 命令 / FAQ）
+    url: https://github.com/Anthony-117spec/AssignmentRadar/blob/main/docs/manual.md
+    about: 装不上、命令怎么用、通知不弹，先看这里，多数问题已有答案
+  - name: 架构与已知限制
+    url: https://github.com/Anthony-117spec/AssignmentRadar/blob/main/docs/architecture.md
+    about: 想知道它为什么这样工作、哪些情况它做不到

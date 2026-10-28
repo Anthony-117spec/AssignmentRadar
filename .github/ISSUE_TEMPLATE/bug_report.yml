@@ -1,0 +1,59 @@
+name: 问题反馈
+description: 安装失败、抓不到作业、通知不弹等问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### ⚠️ 先读这一条
+
+        **不要把 `config.toml`、cookie、令牌，或包含它们的截图贴进来。**
+        Issue 是公开的，贴上去等于把你的账号登录态交给所有人。
+
+        需要排查信息时，运行 `radar.bat check`，把它的输出贴到下面的输入框里——
+        那个输出不含任何凭证。
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私确认
+      options:
+        - label: 我确认下面的内容里没有 config.toml、cookie、令牌或相关截图
+          required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 你在做什么操作，期望什么结果，实际得到了什么
+      placeholder: |
+        例如：双击 一键安装.bat 到第 3 步卡住，窗口一闪就没了。
+    validations:
+      required: true
+
+  - type: textarea
+    id: check
+    attributes:
+      label: radar.bat check 的输出
+      description: 在仓库目录下运行 `radar.bat check`，把输出整段粘过来（已脱敏）
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python 版本
+      description: 运行 `python --version` 的结果
+      placeholder: Python 3.12.4
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 系统
+      placeholder: Windows 11 23H2
+    validations:
+      required: false
